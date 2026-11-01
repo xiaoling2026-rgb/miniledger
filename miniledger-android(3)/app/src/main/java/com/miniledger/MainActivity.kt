@@ -8,6 +8,8 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -30,25 +32,34 @@ class MainActivity : AppCompatActivity() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             val json = intent?.getStringExtra("record") ?: return
-            webView.post { webView.evaluateJavascript("window.__miniLedgerIngest($json)") {} }
+            if (::webView.isInitialized) {
+                webView.post { webView.evaluateJavascript("window.__miniLedgerIngest($json)") {} }
+            }
         }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            setup()
-        } catch (e: Throwable) {
-            val tv = TextView(this)
-            tv.setPadding(48, 48, 48, 48)
-            tv.text = "启动失败：\n${e.javaClass.name}: ${e.message}\n\n${e.stackTraceToString().take(2000)}"
-            setContentView(tv)
-        }
+
+        val boot = TextView(this)
+        boot.setPadding(48, 48, 48, 48)
+        boot.text = "消费记账本启动中…"
+        setContentView(boot)
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                setup()
+            } catch (e: Throwable) {
+                boot.text = "启动失败：\n${e.javaClass.name}: ${e.message}\n\n${e.stackTraceToString().take(2000)}"
+                setContentView(boot)
+            }
+        }, 600)
     }
 
     private fun setup() {
         webView = WebView(this)
+        webView.setLayerType(WebView.LAYER_TYPE_SOFTWARE, null)
         setContentView(webView)
 
         webView.settings.javaScriptEnabled = true
@@ -99,7 +110,7 @@ class MainActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        if (::webView.isInitialized && webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
     override fun onDestroy() {
