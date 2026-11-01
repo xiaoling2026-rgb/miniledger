@@ -7,7 +7,7 @@
         android:allowBackup="true"
         android:hardwareAccelerated="false"
         android:icon="@android:drawable/ic_menu_agenda"
-        android:label="消费记账本"
+        android:label="记账v2"
         android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
 
 
