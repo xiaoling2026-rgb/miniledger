@@ -16,6 +16,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,7 +27,6 @@ class MainActivity : AppCompatActivity() {
         filePathCallback = null
     }
 
-    // 接收通知服务广播，实时把新记录推给页面
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             val json = intent?.getStringExtra("record") ?: return
@@ -45,7 +45,6 @@ class MainActivity : AppCompatActivity() {
         webView.settings.domStorageEnabled = true
         webView.addJavascriptInterface(MiniLedgerBridge(this) {}, "MiniLedgerBridge")
 
-        // 支持 H5 内「导入账单」的文件选择
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
                 wv: WebView?,
@@ -58,7 +57,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 页面加载完后，把本地已存记录注入 H5
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 val existing = LedgerStore.toJson(LedgerStore.load(this@MainActivity))
@@ -67,11 +65,16 @@ class MainActivity : AppCompatActivity() {
         }
         webView.loadUrl("file:///android_asset/index.html")
 
-        registerReceiver(receiver, IntentFilter("com.miniledger.NEW_RECORD"))
+        // 注意：Android 13+ 注册广播必须显式声明导出标志，否则启动即崩溃
+        ContextCompat.registerReceiver(
+            this,
+            receiver,
+            IntentFilter("com.miniledger.NEW_RECORD"),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         checkNotificationPermission()
     }
 
-    /** 首次进入引导用户开启「通知使用权」 */
     private fun checkNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
             val enabled = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
