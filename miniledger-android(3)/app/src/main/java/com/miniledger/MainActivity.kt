@@ -13,10 +13,10 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -37,7 +37,17 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            setup()
+        } catch (e: Throwable) {
+            val tv = TextView(this)
+            tv.setPadding(48, 48, 48, 48)
+            tv.text = "启动失败：\n${e.javaClass.name}: ${e.message}\n\n${e.stackTraceToString().take(2000)}"
+            setContentView(tv)
+        }
+    }
 
+    private fun setup() {
         webView = WebView(this)
         setContentView(webView)
 
@@ -65,22 +75,24 @@ class MainActivity : AppCompatActivity() {
         }
         webView.loadUrl("file:///android_asset/index.html")
 
-        // 注意：Android 13+ 注册广播必须显式声明导出标志，否则启动即崩溃
-        ContextCompat.registerReceiver(
-            this,
-            receiver,
-            IntentFilter("com.miniledger.NEW_RECORD"),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, IntentFilter("com.miniledger.NEW_RECORD"), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(receiver, IntentFilter("com.miniledger.NEW_RECORD"))
+        }
         checkNotificationPermission()
     }
 
     private fun checkNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            val enabled = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-            if (enabled.isNullOrEmpty() || !enabled.contains(packageName)) {
-                Toast.makeText(this, "请开启「通知使用权」以自动记账", Toast.LENGTH_LONG).show()
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            try {
+                val enabled = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+                if (enabled.isNullOrEmpty() || !enabled.contains(packageName)) {
+                    Toast.makeText(this, "请开启「通知使用权」以自动记账", Toast.LENGTH_LONG).show()
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                }
+            } catch (_: Throwable) {
             }
         }
     }
